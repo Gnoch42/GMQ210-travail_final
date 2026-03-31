@@ -1,0 +1,11 @@
+[Unit]
+Description=pi_camera_flask_api
+After=network-online.target mediamtx.service
+
+[Service]
+ExecStart=/home/pi/parc-camera/venv/bin/python /home/pi/parc-camera/camera_api.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

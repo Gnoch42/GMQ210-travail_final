@@ -6,7 +6,6 @@ import requests
 from datetime import datetime, timezone
 from ultralytics import YOLO
 
-
 class Tracker:
     def __init__(self, max_distance=50, max_disappeared=30):
         self.next_id = 0

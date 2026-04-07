@@ -49,3 +49,33 @@ df["score_final"] = df["score_usage"] * df["SHAPE__Area"]
 print("\nScore final :")
 print(df[["TYPE", "score_usage", "score_final"]].head())
 
+
+
+# score ensoleillement
+def score_ensoleillement(type_sol):
+    type_sol = str(type_sol).lower()
+    
+    if "parc" in type_sol or "espace public" in type_sol:
+        return 3
+    elif "résident" in type_sol or "mixte" in type_sol:
+        return 2
+    else:
+        return 1
+
+df["score_ensoleillement"] = df["TYPE"].apply(score_ensoleillement)
+
+print(df[["TYPE", "score_ensoleillement"]].head())
+
+# score total (final)
+df["score_total"] = df["score_usage"] + df["score_ensoleillement"]
+
+print("\nScore final global :")
+print(df[["TYPE", "score_usage", "score_ensoleillement", "score_total"]].head())
+
+df_sorted = df.sort_values(by="score_total", ascending=False)
+
+print("\nZones les plus intéressantes :")
+print(df_sorted[["TYPE", "score_total"]].head())
+
+
+

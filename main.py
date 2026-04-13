@@ -1,10 +1,13 @@
 import cv2
 import math
 import time
+import json
 import psycopg2
 import requests
+import numpy as np
 from datetime import datetime, timezone
 from ultralytics import YOLO
+
 
 class Tracker:
     def __init__(self, max_distance=50, max_disappeared=30):
@@ -75,7 +78,6 @@ class Tracker:
 PI_API = "http://camerapi1.local:5000"
 
 def camera_control(action):
-    """Envoie une commande au Pi. action = start, stop, restart"""
     try:
         r = requests.post(f"{PI_API}/stream/{action}", timeout=5)
         data = r.json()
@@ -86,7 +88,6 @@ def camera_control(action):
         return None
 
 def camera_config(preset):
-    """Change la config caméra. preset = haute, standard, economie"""
     presets = {
         "haute":     {"width": 1920, "height": 1080, "fps": 15, "bitrate": 4000000},
         "standard":  {"width": 1280, "height": 720,  "fps": 15, "bitrate": 2000000},
@@ -105,7 +106,6 @@ def camera_config(preset):
         return None
 
 def camera_health():
-    """Vérifie l'état de la caméra."""
     try:
         r = requests.get(f"{PI_API}/health", timeout=3)
         data = r.json()
@@ -126,6 +126,7 @@ DB_CONFIG = {
 }
 SNAPSHOT_INTERVAL = 30
 CAMERA_ID = "camerapi1"
+CALIBRATION_PATH = "calibration.json"
 
 # Initialisation
 model = YOLO("yolov8n.pt")
@@ -133,6 +134,16 @@ tracker = Tracker(max_distance=50, max_disappeared=30)
 conn = psycopg2.connect(**DB_CONFIG)
 conn.autocommit = True
 cur = conn.cursor()
+
+# Charger la calibration
+homography_matrix = None
+try:
+    with open(CALIBRATION_PATH, "r") as f:
+        calib = json.load(f)
+    homography_matrix = np.array(calib["matrix"], dtype=np.float64)
+    print("Calibration chargée!")
+except FileNotFoundError:
+    print("Pas de calibration — coordonnées GPS non disponibles")
 
 cap = cv2.VideoCapture(STREAM_URL)
 if not cap.isOpened():
@@ -189,11 +200,27 @@ while True:
             if abs(cx - dx) < 1 and abs(cy - dy) < 1:
                 conf = confidences[i]
                 break
-        cur.execute(
-            """INSERT INTO detections (camera_id, timestamp, person_track_id, pixel_x, pixel_y, confidence)
-               VALUES (%s, %s, %s, %s, %s, %s)""",
-            (CAMERA_ID, now, pid, cx, cy, conf)
-        )
+
+        # Homographie pixel → GPS
+        lat, lon = None, None
+        if homography_matrix is not None:
+            point = np.array([[[cx, cy]]], dtype=np.float64)
+            result = cv2.perspectiveTransform(point, homography_matrix)
+            lat = float(result[0][0][0])
+            lon = float(result[0][0][1])
+
+        if lat is not None and lon is not None:
+            cur.execute(
+                """INSERT INTO detections (camera_id, timestamp, person_track_id, pixel_x, pixel_y, location, confidence)
+                   VALUES (%s, %s, %s, %s, %s, ST_SetSRID(ST_MakePoint(%s, %s), 4326), %s)""",
+                (CAMERA_ID, now, pid, cx, cy, lon, lat, conf)
+            )
+        else:
+            cur.execute(
+                """INSERT INTO detections (camera_id, timestamp, person_track_id, pixel_x, pixel_y, confidence)
+                   VALUES (%s, %s, %s, %s, %s, %s)""",
+                (CAMERA_ID, now, pid, cx, cy, conf)
+            )
 
     # Snapshot périodique
     current_time = time.time()
@@ -221,12 +248,10 @@ while True:
     cv2.putText(frame, f"Personnes: {len(persons)}", (10, 30),
                 cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
 
-    # Message de statut temporaire (5 secondes)
     if status_message and current_time - status_time < 5:
         cv2.putText(frame, status_message, (10, h - 20),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
 
-    # Raccourcis en bas
     cv2.putText(frame, "q:quit  h:health  s:stop  r:restart  1:HD  2:STD  3:ECO",
                 (10, h - 50), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (200, 200, 200), 1)
 

@@ -117,7 +117,8 @@ def camera_health():
 
 
 # Configuration
-STREAM_URL = "rtsp://camerapi1.local:8554/parc"
+#STREAM_URL = "rtsp://camerapi1.local:8554/parc"
+STREAM_URL = "/Users/remybillette/Library/Mobile Documents/com~apple~CloudDocs/Principale/2 - École/H2026/géoinformatique/Projet final/Test vidéo/capture_parc4.mp4"
 DB_CONFIG = {
     "dbname": "parc_frequentation",
     "user": "remybillette",
@@ -211,9 +212,9 @@ while True:
 
         if lat is not None and lon is not None:
             cur.execute(
-                """INSERT INTO detections (camera_id, timestamp, person_track_id, pixel_x, pixel_y, location, confidence)
-                   VALUES (%s, %s, %s, %s, %s, ST_SetSRID(ST_MakePoint(%s, %s), 4326), %s)""",
-                (CAMERA_ID, now, pid, cx, cy, lon, lat, conf)
+                """INSERT INTO detections (camera_id, timestamp, person_track_id, pixel_x, pixel_y, location, location_32198, confidence)
+                   VALUES (%s, %s, %s, %s, %s, ST_SetSRID(ST_MakePoint(%s, %s), 4326), ST_Transform(ST_SetSRID(ST_MakePoint(%s, %s), 4326), 32198), %s)""",
+                (CAMERA_ID, now, pid, cx, cy, lon, lat, lon, lat, conf)
             )
         else:
             cur.execute(

@@ -117,8 +117,6 @@ def camera_health():
 
 
 # Configuration
-#STREAM_URL = "rtsp://camerapi1.local:8554/parc"
-STREAM_URL = "/Users/remybillette/Library/Mobile Documents/com~apple~CloudDocs/Principale/2 - École/H2026/géoinformatique/Projet final/Test vidéo/capture_parc4.mp4"
 DB_CONFIG = {
     "dbname": "parc_frequentation",
     "user": "remybillette",
@@ -146,6 +144,7 @@ try:
 except FileNotFoundError:
     print("Pas de calibration — coordonnées GPS non disponibles")
 
+STREAM_URL = "rtsp://camerapi1.local:8554/parc"
 cap = cv2.VideoCapture(STREAM_URL)
 if not cap.isOpened():
     print("Impossible de se connecter au flux")
@@ -176,7 +175,7 @@ while True:
         time.sleep(2)
         cap = cv2.VideoCapture(STREAM_URL)
         continue
-
+    frame = cv2.resize(frame, (1920, 1080))
     results = model(frame, verbose=False, conf=0.3)
 
     centroids = []

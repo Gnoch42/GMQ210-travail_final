@@ -3,7 +3,7 @@ import json
 import numpy as np
 
 # Charger un frame de ta vidéo
-VIDEO_PATH = "/Users/remybillette/Library/Mobile Documents/com~apple~CloudDocs/Principale/2 - École/H2026/géoinformatique/Projet final/Test vidéo/capture_parc3.mp4"
+VIDEO_PATH = "rtsp://camerapi1.local:8554/parc"
 cap = cv2.VideoCapture(VIDEO_PATH)
 ret, frame = cap.read()
 cap.release()

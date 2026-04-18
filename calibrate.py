@@ -33,7 +33,7 @@ import numpy as np
 # ============================================================================
 
 # URL du flux RTSP fourni par le serveur MediaMTX
-VIDEO_PATH = "rtsp://camerapi1.local:8554/parc"
+VIDEO_PATH = "/Users/remybillette/Library/Mobile Documents/com~apple~CloudDocs/Principale/2 - École/H2026/géoinformatique/Projet final/Test vidéo/capture_parc3.mp4"
 
 # Ouvre le flux et lit un seul frame pour l'afficher en image fixe
 cap = cv2.VideoCapture(VIDEO_PATH)

@@ -221,12 +221,12 @@ def camera_config(preset):
         - economie : 640x480 @ 10 fps @ 800 kbps (faible consommation, qualité réduite)
     """
     presets = {
-        "haute":     {"width": 1920, "height": 1080, "fps": 15, "bitrate": 4000000},
+        "high":      {"width": 1920, "height": 1080, "fps": 15, "bitrate": 4000000},
         "standard":  {"width": 1280, "height": 720,  "fps": 15, "bitrate": 2000000},
-        "economie":  {"width": 640,  "height": 480,  "fps": 10, "bitrate": 800000},
+        "economy":   {"width": 640,  "height": 480,  "fps": 10, "bitrate": 800000},
     }
     if preset not in presets:
-        print(f"[Config] Preset inconnu: {preset}")
+        print(f"[Config] Unknown preset: {preset}")
         return None
     try:
         # Envoie une requête PUT avec le dictionnaire de configuration du preset
@@ -495,8 +495,8 @@ while True:
         cap = cv2.VideoCapture(STREAM_URL)
     elif key == ord("1"):
         # Passer en haute qualité (1920x1080) et relancer la capture
-        camera_config("haute")
-        status_message = "Config: haute qualite"
+        camera_config("high")
+        status_message = "Config: high quality"
         status_time = time.time()
         cap.release()
         time.sleep(3)
@@ -511,8 +511,8 @@ while True:
         cap = cv2.VideoCapture(STREAM_URL)
     elif key == ord("3"):
         # Passer en économie (640x480) et relancer la capture
-        camera_config("economie")
-        status_message = "Config: economie"
+        camera_config("economy")
+        status_message = "Config: economy"
         status_time = time.time()
         cap.release()
         time.sleep(3)

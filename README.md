@@ -1,63 +1,63 @@
-# Système d'analyse de fréquentation de parc
+# Park Attendance Analysis System
 
-Ce système utilise une caméra installée dans un parc pour détecter les personnes, suivre leurs déplacements, et convertir leurs positions en coordonnées GPS. Les données sont stockées dans une base de données spatiale (PostGIS) pour analyse dans QGIS.
+This system uses a camera installed in a park to detect people, track their movements, and convert their positions into GPS coordinates. Data is stored in a spatial database (PostGIS) for analysis in QGIS.
 
-## Matériel nécessaire
+## Required Hardware
 
-- Raspberry Pi 4 (4 Go RAM) avec Raspberry Pi OS Lite
-- Module caméra IMX219 (connecté au port CSI du Pi)
-- Carte microSD 32 Go+
-- Alimentation USB-C pour le Pi
-- Mac (pour le traitement et l'analyse)
-- Les deux appareils doivent être sur le même réseau WiFi
+- Raspberry Pi 4 (4 GB RAM) with Raspberry Pi OS Lite
+- IMX219 camera module (connected to the Pi's CSI port)
+- 32 GB+ microSD card
+- USB-C power supply for the Pi
+- Mac (for processing and analysis)
+- Both devices must be on the same WiFi network
 
 ## Architecture
 
 ```
-Parc                                      Bureau
+Park                                      Office
 ┌─────────────────────┐                   ┌──────────────────────────────┐
 │  Raspberry Pi 4     │                   │  Mac                         │
 │                     │     WiFi          │                              │
 │  IMX219 → MediaMTX ─┼──── RTSP ───────→│  OpenCV → YOLOv8 → Tracker  │
-│           (stream)  │                   │           → Homographie      │
+│           (stream)  │                   │           → Homography       │
 │  Flask API          │                   │           → PostGIS          │
-│  (contrôle caméra)  │                   │                              │
-└─────────────────────┘                   │  QGIS (visualisation)        │
+│  (camera control)   │                   │                              │
+└─────────────────────┘                   │  QGIS (visualization)        │
                                           └──────────────────────────────┘
 ```
 
-La caméra capture les images sur le Pi, MediaMTX les stream en RTSP via WiFi, et tout le traitement (détection, tracking, conversion GPS, stockage) se fait sur le Mac.
+The camera captures images on the Pi, MediaMTX streams them over RTSP via WiFi, and all processing (detection, tracking, GPS conversion, storage) happens on the Mac.
 
 ---
 
-## 1. Configuration du Raspberry Pi
+## 1. Raspberry Pi Setup
 
-### 1.1 Installer Raspberry Pi OS Lite
+### 1.1 Install Raspberry Pi OS Lite
 
-Utiliser Raspberry Pi Imager sur le Mac pour flasher Raspberry Pi OS Lite (64-bit) sur la carte SD. Dans les paramètres avancés, configurer le WiFi et activer SSH.
+Use Raspberry Pi Imager on the Mac to flash Raspberry Pi OS Lite (64-bit) onto the SD card. In the advanced settings, configure WiFi and enable SSH.
 
-### 1.2 Se connecter au Pi
+### 1.2 Connect to the Pi
 
 ```bash
-ssh pi@<IP_DU_PI>
+ssh pi@<PI_IP_ADDRESS>
 ```
 
-Pour trouver l'IP du Pi, regarder dans l'interface de ton routeur ou utiliser `ping camerapi1.local`.
+To find the Pi's IP address, check your router's interface or use `ping camerapi1.local`.
 
-### 1.3 Installer les outils caméra
+### 1.3 Install camera tools
 
 ```bash
 sudo apt update && sudo apt upgrade -y
 sudo apt install -y rpicam-apps-lite
 ```
 
-Vérifier que la caméra est détectée :
+Verify the camera is detected:
 
 ```bash
 rpicam-hello --list-cameras -v
 ```
 
-### 1.4 Installer MediaMTX (serveur de streaming RTSP)
+### 1.4 Install MediaMTX (RTSP streaming server)
 
 ```bash
 cd ~
@@ -67,13 +67,13 @@ sudo cp mediamtx /usr/local/bin/
 sudo cp mediamtx.yml /usr/local/etc/mediamtx.yml
 ```
 
-Modifier la configuration pour activer la caméra :
+Edit the configuration to enable the camera:
 
 ```bash
 sudo nano /usr/local/etc/mediamtx.yml
 ```
 
-Aller tout en bas du fichier et remplacer la section `paths:` par :
+Scroll to the bottom of the file and replace the `paths:` section with:
 
 ```yaml
 paths:
@@ -82,21 +82,21 @@ paths:
   all_others:
 ```
 
-Attention à l'indentation : 2 espaces devant `parc:`, 4 espaces devant `source:`.
+Note the indentation: 2 spaces before `parc:`, 4 spaces before `source:`.
 
-Donner les droits de modification à l'utilisateur pi :
+Give the pi user write permissions:
 
 ```bash
 sudo chown pi:pi /usr/local/etc/mediamtx.yml
 ```
 
-### 1.5 Créer le service systemd pour MediaMTX
+### 1.5 Create the systemd service for MediaMTX
 
 ```bash
 sudo nano /etc/systemd/system/mediamtx.service
 ```
 
-Contenu :
+Content:
 
 ```
 [Unit]
@@ -112,36 +112,36 @@ RestartSec=5
 WantedBy=multi-user.target
 ```
 
-Activer et démarrer :
+Enable and start:
 
 ```bash
 sudo systemctl daemon-reload
 sudo systemctl enable --now mediamtx
 ```
 
-Vérifier que ça tourne :
+Verify it is running:
 
 ```bash
 sudo systemctl status mediamtx
 ```
 
-### 1.6 Tester le flux RTSP
+### 1.6 Test the RTSP stream
 
-Depuis le Mac, ouvrir VLC → Fichier → Ouvrir un flux réseau :
+From the Mac, open VLC → File → Open Network Stream:
 
 ```
-rtsp://<IP_DU_PI>:8554/parc
+rtsp://<PI_IP_ADDRESS>:8554/parc
 ```
 
-Ou avec ffplay (installer ffmpeg via `brew install ffmpeg`) :
+Or with ffplay (install ffmpeg via `brew install ffmpeg`):
 
 ```bash
-ffplay rtsp://<IP_DU_PI>:8554/parc
+ffplay rtsp://<PI_IP_ADDRESS>:8554/parc
 ```
 
-### 1.7 Installer l'API Flask de contrôle
+### 1.7 Install the Flask control API
 
-Sur le Pi, créer le projet :
+On the Pi, create the project:
 
 ```bash
 mkdir -p ~/parc-camera
@@ -151,13 +151,13 @@ source venv/bin/activate
 pip install flask psutil requests
 ```
 
-Créer le fichier API :
+Create the API file:
 
 ```bash
 nano ~/parc-camera/camera_api.py
 ```
 
-Contenu :
+Content:
 
 ```python
 from flask import Flask, jsonify, request
@@ -182,14 +182,14 @@ def health():
 @app.route("/stream/<action>", methods=["POST"])
 def stream_control(action):
     if action not in ("start", "stop", "restart"):
-        return jsonify({"error": "Action invalide"}), 400
+        return jsonify({"error": "Invalid action"}), 400
     result = subprocess.run(
         ["sudo", "systemctl", action, "mediamtx"],
         capture_output=True, text=True
     )
     success = result.returncode == 0
     return jsonify({
-        "message": f"Stream {action}" if success else f"Échec {action}",
+        "message": f"Stream {action}" if success else f"Failed {action}",
         "success": success
     })
 
@@ -197,7 +197,7 @@ def stream_control(action):
 def update_config():
     data = request.get_json()
     if not data:
-        return jsonify({"error": "Body JSON requis"}), 400
+        return jsonify({"error": "JSON body required"}), 400
 
     mapping = {
         "width": "rpiCameraWidth",
@@ -225,7 +225,7 @@ def update_config():
     )
     success = result.returncode == 0
     return jsonify({
-        "message": "Configuration appliquée" if success else "Échec du redémarrage",
+        "message": "Configuration applied" if success else "Restart failed",
         "config": data,
         "success": success
     })
@@ -234,25 +234,25 @@ if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
 ```
 
-### 1.8 Configurer sudo sans mot de passe pour systemctl
+### 1.8 Configure passwordless sudo for systemctl
 
 ```bash
 sudo visudo -f /etc/sudoers.d/mediamtx
 ```
 
-Ajouter cette ligne :
+Add this line:
 
 ```
 pi ALL=(ALL) NOPASSWD: /usr/bin/systemctl start mediamtx, /usr/bin/systemctl stop mediamtx, /usr/bin/systemctl restart mediamtx
 ```
 
-### 1.9 Créer le service systemd pour l'API Flask
+### 1.9 Create the systemd service for the Flask API
 
 ```bash
 sudo nano /etc/systemd/system/camera-api.service
 ```
 
-Contenu :
+Content:
 
 ```
 [Unit]
@@ -270,51 +270,51 @@ RestartSec=5
 WantedBy=multi-user.target
 ```
 
-Activer et démarrer :
+Enable and start:
 
 ```bash
 sudo systemctl daemon-reload
 sudo systemctl enable --now camera-api
 ```
 
-### 1.10 Vérifier que tout fonctionne sur le Pi
+### 1.10 Verify everything works on the Pi
 
 ```bash
-# Vérifier les services
+# Check services
 sudo systemctl status mediamtx
 sudo systemctl status camera-api
 
-# Tester l'API depuis le Mac
-curl http://<IP_DU_PI>:5000/health
+# Test the API from the Mac
+curl http://<PI_IP_ADDRESS>:5000/health
 ```
 
 ---
 
-## 2. Configuration du Mac
+## 2. Mac Setup
 
-### 2.1 Installer les prérequis
+### 2.1 Install prerequisites
 
 ```bash
-# PostgreSQL et PostGIS
+# PostgreSQL and PostGIS
 brew install postgresql@17 postgis
 brew services start postgresql@17
 
-# Ajouter au PATH (si pas déjà fait)
+# Add to PATH (if not already done)
 echo 'export PATH="/opt/homebrew/opt/postgresql@17/bin:$PATH"' >> ~/.zshrc
 source ~/.zshrc
 
-# ffmpeg (pour enregistrer des vidéos)
+# ffmpeg (for recording videos)
 brew install ffmpeg
 ```
 
-### 2.2 Créer la base de données
+### 2.2 Create the database
 
 ```bash
 createdb parc_frequentation
 psql -d parc_frequentation -c "CREATE EXTENSION IF NOT EXISTS postgis;"
 ```
 
-Créer les tables :
+Create the tables:
 
 ```bash
 psql -d parc_frequentation -c "
@@ -347,7 +347,7 @@ CREATE INDEX idx_snapshots_timestamp ON occupancy_snapshots(timestamp);
 "
 ```
 
-### 2.3 Installer les dépendances Python
+### 2.3 Install Python dependencies
 
 ```bash
 cd ~/parc-analyse
@@ -356,165 +356,165 @@ source venv/bin/activate
 pip install opencv-python ultralytics psycopg2-binary requests numpy
 ```
 
-### 2.4 Placer les fichiers
+### 2.4 Place the project files
 
-Le dossier du projet doit contenir :
+The project folder must contain:
 
 ```
-projet/
-├── main.py              # Pipeline principal
-├── calibrate.py         # Script de calibration
-└── calibration.json     # Généré par calibrate.py
+project/
+├── main.py              # Main pipeline
+├── calibrate.py         # Calibration script
+└── calibration.json     # Generated by calibrate.py
 ```
 
 ---
 
-## 3. Calibration (homographie)
+## 3. Calibration (homography)
 
-La calibration permet de convertir les positions en pixels (sur l'image de la caméra) en coordonnées GPS réelles. Elle doit être faite une fois, quand la caméra est installée à sa position finale.
+Calibration maps pixel positions (in the camera image) to real GPS coordinates. It only needs to be done once, when the camera is installed in its final position.
 
-### 3.1 Enregistrer une vidéo depuis le terrain
+### 3.1 Record a video from the field
 
 ```bash
-ffmpeg -i rtsp://<IP_DU_PI>:8554/parc -c copy -t 60 ~/Desktop/capture_parc.mp4
+ffmpeg -i rtsp://<PI_IP_ADDRESS>:8554/parc -c copy -t 60 ~/Desktop/capture_parc.mp4
 ```
 
-### 3.2 Identifier les points de référence
+### 3.2 Identify reference points
 
-Sur le terrain, identifier au moins 4 points fixes et bien visibles dans le champ de la caméra : coins de bancs, intersections de sentiers, bases de lampadaires, etc. Relever leurs coordonnées GPS avec Google Maps (appui long → copier les coordonnées) ou Google Earth Pro.
+In the field, identify at least 4 fixed, clearly visible points within the camera's field of view: bench corners, path intersections, lamp post bases, etc. Record their GPS coordinates using Google Maps (long press → copy coordinates) or Google Earth Pro.
 
-### 3.3 Lancer la calibration
+### 3.3 Run calibration
 
 ```bash
 python calibrate.py
 ```
 
-Modifier le chemin de la vidéo dans `calibrate.py` si nécessaire (variable `VIDEO_PATH`).
+Update the video path in `calibrate.py` if needed (variable `VIDEO_PATH`).
 
-Le script affiche une image de la vidéo. Pour chaque point de référence :
+The script displays a frame from the video. For each reference point:
 
-1. Cliquer sur le point dans l'image
-2. Dans le terminal, entrer les coordonnées GPS au format : `45.379385, -71.929164`
-3. Répéter pour au moins 4 points (plus il y en a, mieux c'est)
-4. Taper `q` dans le terminal pour terminer
+1. Click on the point in the image
+2. In the terminal, enter the GPS coordinates in the format: `45.379385, -71.929164`
+3. Repeat for at least 4 points (more is better)
+4. Type `q` in the terminal to finish
 
-Le script génère un fichier `calibration.json` contenant la matrice de transformation.
+The script generates a `calibration.json` file containing the transformation matrix.
 
-Important : la résolution de la vidéo de calibration doit être la même que celle utilisée dans `main.py`. Si le flux RTSP est en 1920x1080, calibrer avec une vidéo en 1920x1080.
+Important: the resolution of the calibration video must match the one used in `main.py`. If the RTSP stream is 1920x1080, calibrate with a 1920x1080 video.
 
 ---
 
-## 4. Utilisation
+## 4. Usage
 
-### 4.1 Lancer le pipeline de détection
+### 4.1 Start the detection pipeline
 
 ```bash
 python main.py
 ```
 
-Par défaut, `main.py` se connecte au flux RTSP de la caméra. Pour analyser une vidéo enregistrée, modifier la variable `STREAM_URL` dans `main.py` :
+By default, `main.py` connects to the camera's RTSP stream. To analyze a recorded video, change the `STREAM_URL` variable in `main.py`:
 
 ```python
-# Flux en direct
+# Live stream
 STREAM_URL = "rtsp://camerapi1.local:8554/parc"
 
-# Vidéo enregistrée
-STREAM_URL = "/chemin/vers/video.mp4"
+# Recorded video
+STREAM_URL = "/path/to/video.mp4"
 ```
 
-### 4.2 Raccourcis clavier (dans la fenêtre vidéo)
+### 4.2 Keyboard shortcuts (in the video window)
 
-| Touche | Action |
-|--------|--------|
-| `q` | Quitter |
-| `h` | Vérifier l'état de la caméra (health check) |
-| `s` | Arrêter le stream |
-| `r` | Redémarrer le stream |
-| `1` | Preset haute qualité (1920x1080, 15fps) |
-| `2` | Preset standard (1280x720, 15fps) |
-| `3` | Preset économie (640x480, 10fps) |
+| Key | Action |
+|-----|--------|
+| `q` | Quit |
+| `h` | Check camera health |
+| `s` | Stop stream |
+| `r` | Restart stream |
+| `1` | High quality preset (1920x1080, 15fps) |
+| `2` | Standard preset (1280x720, 15fps) |
+| `3` | Economy preset (640x480, 10fps) |
 
-Les raccourcis de contrôle caméra (h, s, r, 1, 2, 3) ne fonctionnent qu'avec le flux en direct, pas avec une vidéo enregistrée.
+Camera control shortcuts (h, s, r, 1, 2, 3) only work with the live stream, not with a recorded video.
 
-### 4.3 Contrôler la caméra via le terminal
+### 4.3 Control the camera from the terminal
 
 ```bash
-# Vérifier l'état
-curl http://<IP_DU_PI>:5000/health
+# Check status
+curl http://<PI_IP_ADDRESS>:5000/health
 
-# Arrêter / démarrer / redémarrer le stream
-curl -X POST http://<IP_DU_PI>:5000/stream/stop
-curl -X POST http://<IP_DU_PI>:5000/stream/start
-curl -X POST http://<IP_DU_PI>:5000/stream/restart
+# Stop / start / restart the stream
+curl -X POST http://<PI_IP_ADDRESS>:5000/stream/stop
+curl -X POST http://<PI_IP_ADDRESS>:5000/stream/start
+curl -X POST http://<PI_IP_ADDRESS>:5000/stream/restart
 
-# Changer la résolution
-curl -X PUT http://<IP_DU_PI>:5000/config \
+# Change resolution
+curl -X PUT http://<PI_IP_ADDRESS>:5000/config \
   -H "Content-Type: application/json" \
   -d '{"width": 1920, "height": 1080, "fps": 15, "bitrate": 4000000}'
 ```
 
-### 4.4 Enregistrer le flux vidéo
+### 4.4 Record the video stream
 
 ```bash
-# Enregistrer 1 heure
-ffmpeg -i rtsp://<IP_DU_PI>:8554/parc -c copy -t 3600 ~/Desktop/capture.mp4
+# Record for 1 hour
+ffmpeg -i rtsp://<PI_IP_ADDRESS>:8554/parc -c copy -t 3600 ~/Desktop/capture.mp4
 
-# Ctrl+C pour arrêter avant
+# Ctrl+C to stop early
 ```
 
 ---
 
-## 5. Visualisation dans QGIS
+## 5. Visualization in QGIS
 
-### 5.1 Se connecter à PostGIS
+### 5.1 Connect to PostGIS
 
-Dans QGIS : Couche → Ajouter une couche → PostGIS
+In QGIS: Layer → Add Layer → PostGIS
 
-Paramètres de connexion :
+Connection parameters:
 
-| Champ | Valeur |
-|-------|--------|
-| Hôte | localhost |
+| Field | Value |
+|-------|-------|
+| Host | localhost |
 | Port | 5432 |
-| Base de données | parc_frequentation |
-| Utilisateur | *(ton nom d'utilisateur Mac)* |
-| Mot de passe | *(laisser vide)* |
+| Database | parc_frequentation |
+| User | *(your Mac username)* |
+| Password | *(leave blank)* |
 
-### 5.2 Ajouter les couches
+### 5.2 Add layers
 
-Sélectionner la table `detections` avec la colonne géométrique `location_32198` (en EPSG:32198, NAD83 / Québec Lambert) pour que les points concordent avec les autres couches québécoises.
+Select the `detections` table with the `location_32198` geometry column (in EPSG:32198, NAD83 / Quebec Lambert) so that points align with other Quebec layers.
 
-### 5.3 Requêtes utiles
+### 5.3 Useful queries
 
 ```sql
--- Nombre total de détections
+-- Total number of detections
 SELECT COUNT(*) FROM detections;
 
--- Derniers snapshots d'occupation
+-- Latest occupancy snapshots
 SELECT * FROM occupancy_snapshots ORDER BY timestamp DESC LIMIT 10;
 
--- Détections avec coordonnées GPS
+-- Detections with GPS coordinates
 SELECT pixel_x, pixel_y, ST_AsText(location), confidence
 FROM detections WHERE location IS NOT NULL
 ORDER BY timestamp DESC LIMIT 10;
 
--- Vider la base pour recommencer
+-- Clear the database to start fresh
 DELETE FROM detections;
 DELETE FROM occupancy_snapshots;
 ```
 
 ---
 
-## Dépannage
+## Troubleshooting
 
-| Problème | Solution |
-|----------|----------|
-| Caméra non détectée sur le Pi | Vérifier le câble ruban, essayer `rpicam-hello --list-cameras -v` |
-| Flux RTSP ne fonctionne pas | `sudo systemctl status mediamtx` pour voir les erreurs |
-| API Flask ne répond pas | `sudo systemctl status camera-api` pour voir les erreurs |
-| YOLOv8 détecte mal | Ajuster le seuil de confiance (0.3 par défaut), vérifier l'éclairage |
-| Détections multiples d'une même personne | Augmenter `max_distance` dans le Tracker |
-| Points GPS décalés dans QGIS | Vérifier que la couche utilise `location_32198`, vérifier la calibration |
-| PostgreSQL ne démarre pas | `brew services restart postgresql@17` |
-| Erreur "No space left" sur le Pi | `TMPDIR=/home/pi/tmp pip install --no-cache-dir <paquet>` |
-| Image coupée dans calibrate.py | Ajuster `DISPLAY_WIDTH` ou utiliser `cv2.WINDOW_NORMAL` |
+| Problem | Solution |
+|---------|----------|
+| Camera not detected on Pi | Check the ribbon cable, try `rpicam-hello --list-cameras -v` |
+| RTSP stream not working | `sudo systemctl status mediamtx` to see errors |
+| Flask API not responding | `sudo systemctl status camera-api` to see errors |
+| YOLOv8 detecting poorly | Adjust the confidence threshold (0.3 by default), check lighting |
+| Multiple detections of the same person | Increase `max_distance` in the Tracker |
+| GPS points offset in QGIS | Verify the layer uses `location_32198`, check the calibration |
+| PostgreSQL won't start | `brew services restart postgresql@17` |
+| "No space left" error on Pi | `TMPDIR=/home/pi/tmp pip install --no-cache-dir <package>` |
+| Image cropped in calibrate.py | Adjust `DISPLAY_WIDTH` or use `cv2.WINDOW_NORMAL` |

@@ -1,6 +1,6 @@
 # Park Attendance Analysis System
 
-This system uses a camera installed in a park to detect people, track their movements, and convert their positions into GPS coordinates. Data is stored in a spatial database (PostGIS) for analysis in QGIS.
+ This system uses a camera installed in a park to detect people, track their movements, and convert their positions into GPS coordinates. Data is stored in a spatial database (PostGIS) for analysis in QGIS.
 
 ## Required Hardware
 

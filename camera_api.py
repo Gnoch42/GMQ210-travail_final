@@ -41,6 +41,7 @@ def health():
         }
 
     Code HTTP : 200 OK
+
     """
     # Exécute : systemctl is-active mediamtx
     # Retourne "active" si le service est en cours d'exécution, sinon autre chose
